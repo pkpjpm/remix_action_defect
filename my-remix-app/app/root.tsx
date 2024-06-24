@@ -1,12 +1,49 @@
 import {
   Form,
+  Link,
   Links,
   Meta,
+  Outlet,
   Scripts,
   ScrollRestoration,
+  isRouteErrorResponse,
+  json,
+  useLoaderData,
+  useRouteError,
 } from "@remix-run/react";
 
+import { createEmptyContact, getContacts } from "./data";
+import type { LinksFunction } from "@remix-run/node";
+
+import appStylesHref from "./app.css?url";
+
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: appStylesHref },
+];
+
+const not_authorized_url = "http://localhost:3333/api/va/staff_members/1";
+
+const makeUnauthorizedCall = async () => {
+  const response = await fetch(not_authorized_url);
+  console.dir(response);
+  if (!response.ok) throw response;
+};
+
+export const loader = async () => {
+  const contacts = await getContacts();
+  // await makeUnauthorizedCall();
+  return json({ contacts });
+};
+
+export const action = async () => {
+  const contact = await createEmptyContact();
+  await makeUnauthorizedCall();
+  return json({ contact });
+};
+
 export default function App() {
+  const { contacts } = useLoaderData<typeof loader>();
+
   return (
     <html lang="en">
       <head>
@@ -35,19 +72,44 @@ export default function App() {
           </div>
           <nav>
             <ul>
-              <li>
-                <a href={`/contacts/1`}>Your Name</a>
-              </li>
-              <li>
-                <a href={`/contacts/2`}>Your Friend</a>
-              </li>
+              {contacts.map((contact) => (
+                <li key={contact.id}>
+                  <Link to={`contacts/${contact.id}`}>
+                    {contact.first || contact.last ? (
+                      <>
+                        {contact.first} {contact.last}
+                      </>
+                    ) : (
+                      <i>No Name</i>
+                    )}{" "}
+                    {contact.favorite ? <span>★</span> : null}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </nav>
         </div>
-
+        <div id="detail">
+          <Outlet />
+        </div>
         <ScrollRestoration />
         <Scripts />
       </body>
     </html>
   );
 }
+
+export const ErrorBoundary = () => {
+  const theError = useRouteError();
+  const errorDetails = isRouteErrorResponse(theError)
+    ? `status:${theError.status} detail:${theError.statusText}`
+    : "not a route error";
+  return (
+    <html lang="en">
+      <body>
+        <h1>Error</h1>
+        <p>{errorDetails}</p>
+      </body>
+    </html>
+  );
+};
